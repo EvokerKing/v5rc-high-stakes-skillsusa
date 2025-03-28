@@ -58,118 +58,127 @@ void autonomous() {}
  * task, not resume it from where it left off.
  */
 void opcontrol() {
-	pros::Controller master(pros::E_CONTROLLER_MASTER);
+	pros::Controller master(pros::E_CONTROLLER_MASTER); // the object for the controller to get inputs
 	pros::MotorGroup left_mg({1, -2, 3});    // Creates a motor group with forwards ports 1 & 3 and reversed port 2
 	pros::MotorGroup right_mg({-4, 5, -6});  // Creates a motor group with forwards port 5 and reversed ports 4 & 6
-	pros::Motor conveyor(-7);
-	pros::adi::AnalogOut clamp(1);
-	pros::Motor arm(9);
-	pros::Rotation rotation(7);
-	pros::Optical color(16);
+	pros::Motor conveyor(-10); // motor for the conveyor belt
+	pros::adi::DigitalOut clamp(1); // pneumatics solenoid controlling the clamp
+	pros::Motor arm(9); // motor for the arm (lady brown mech)
+	pros::Rotation rotation(7); // rotation sensor to get location of the arm
+	pros::Optical color(16); // color sensor, ended up not using it but the light looks cool so its still in the code
 
-	color.set_led_pwm(100);
+	color.set_led_pwm(100); // turn on the color sensor light
 
-	rotation.reset_position();
+	rotation.reset_position(); // reset rotation sensor position to 0 to make everything relative to starting position
 	const int ideal_angle = 1500; // 15 degrees
 
-	bool conveyorMoving = false;
-	bool clamped = false;
-	bool last_clamped = false;
-	bool throw_blues = true;
+	bool conveyorMoving = false; // variable to track if the conveyor is actively moving. used for checks when no button is pressed but power draw is low
+	bool clamped = false; // variable to track if the clamp is currently down. used to allow both actions to be mapped to 1 button
+	bool last_clamped = false; // variable to track if the clamp was activated or deactivated on the last cycle. used to prevent the clamp going up and down too quickly on accident
 
-	FILE* file = fopen("/usd/recording.txt", "w");
-	string output = "";
+	FILE* file = fopen("/usd/recording.txt", "w"); // open the recording file with write mode
+	string output = ""; // initialize the string that will be written, as this variable will be added to every cycle
 
-	int time = 0;
+	int time = 0; // set the time to 0 and track it to make sure the robot stops and writes file at the time limit
 
-	while (time < 60000) {
-		pros::lcd::print(0, "left %d right %d", master.get_analog(ANALOG_LEFT_Y),
-		                 master.get_analog(ANALOG_RIGHT_X));  // Prints status of the emulated screen LCDs
-		pros::lcd::print(1, "rotational %d", rotation.get_position());
+	while (time < 60000) { // while loop that runs each cycle while under the time limit
+		pros::lcd::print(0, "left %d right %d", master.get_analog(ANALOG_LEFT_Y), master.get_analog(ANALOG_RIGHT_X));  // prints the status of the joysticks
+		pros::lcd::print(1, "rotational %d", rotation.get_position()); // prints the current rotation according to the rotation sensor for debugging purposes
 
 		// Arcade control scheme
 		int dir = master.get_analog(ANALOG_LEFT_Y) * -1;    // Gets amount forward/backward from left joystick
 		int turn = master.get_analog(ANALOG_RIGHT_X);  // Gets the turn left/right from right joystick
 		left_mg.move(dir - turn);                      // Sets left motor voltage
 		right_mg.move(dir + turn);                     // Sets right motor voltage
-		output += to_string(dir) + ":" + to_string(turn);
+		output += to_string(dir) + ":" + to_string(turn); // add the drivetrain movement variables to the file output
 
-		int a = master.get_digital(DIGITAL_A);
-		int b = master.get_digital(DIGITAL_B);
-		int r1 = master.get_digital(DIGITAL_R1);
-		int l1 = master.get_digital(DIGITAL_L1);
-		if (b == 1 && conveyor.get_power() > 0.1) {
-			conveyor.brake();
-			conveyorMoving = false;
-		} else if (a == 1) {
-			conveyor.move(127);
-			conveyorMoving = true;
-		} else if (r1 == 1) {
-			conveyor.move_voltage(6000);
-			conveyorMoving = false;
-		} else if (l1 == 1) {
-			conveyor.move_voltage(-6000);
-			conveyorMoving = false;
-		} else if (abs(conveyor.get_current_draw()) <= 6000 && !conveyorMoving) {
-			conveyor.brake();
+		// checks if buttons a, b, r1, or l1 are being pressed and stores them in corresponding variables
+		int a = master.get_digital(DIGITAL_A); // start button
+		int b = master.get_digital(DIGITAL_B); // stop button
+		int r1 = master.get_digital(DIGITAL_R1); // slow move button
+		int l1 = master.get_digital(DIGITAL_L1); // slow reverse button
+		// control flow logic for different controls regarding the conveyor
+		if (b == 1 && conveyor.get_power() > 0.1) { // if the b button is pressed and the conveyor is being powered NOTE: THIS TAKES MASSIVE PRIORITY OVER ALL CONTROLS
+			conveyor.brake(); // then brake the conveyor motor
+			conveyorMoving = false; // and update variables
+		} else if (a == 1) { // or if the a button is pressed
+			conveyor.move(127); // begin moving the conveyor at full speed
+			conveyorMoving = true; // and update variables
+		} else if (r1 == 1) { // or if the r1 button is pressed
+			conveyor.move_voltage(9000); // move at 9v out of 12v to be at a slower pace for fixing issues mid run
+			conveyorMoving = false; // and update variables
+		} else if (l1 == 1) { // or if l1 is pressed
+			conveyor.move_voltage(-9000); // move reverse at 9v out of 12v to fix issues mid run
+			conveyorMoving = false; // and update variables
+		} else if (abs(conveyor.get_current_draw()) <= 5000 && !conveyorMoving) { // and finally if the conveyor power draw is lower than 5v and the conveyor isnt supposed to be moving
+			conveyor.brake(); // then brake the conveyor motor
+			// note this is mainly to prevent issues with the conveyor not stopping after l1 or r1 is pressed or not stopping for the main a button
 		}
+        // write each button that is pressed this cycle
         if (a) { output += "a"; }
         if (b) { output += "b"; }
         if (r1) { output += "r"; }
         if (l1) { output += "l"; }
 
-        int x = master.get_digital(DIGITAL_X);
-        if (x == 1) {
-        	if (last_clamped) {} else if (clamped) {
-            	clamp.set_value(false);
-                clamped = false;
-            } else {
-            	clamp.set_value(true);
-                clamped = true;
-            }
-			last_clamped = true;
-        } else {
-        	last_clamped = false;
-        }
+		// checks if the x button is pressed
+		int x = master.get_digital(DIGITAL_X); // clamp interact button
+		if (x == 1) { // if x is pressed
+			// enter another logic flow
+			if (last_clamped) {} /* prevent flow from continuing if it x was pressed last cycle */ else if (clamped) { // if it is already clamped
+				clamp.set_value(false); // unclamp it
+				clamped = false; // and update variables
+			} else { // if it isn't already clamped
+				clamp.set_value(true); // clamp it
+				clamped = true; // and update variables
+			}
+			last_clamped = true; // update variables at end to say x was pressed this (which will be last) cycle
+		} else { // or if x isn't pressed
+			last_clamped = false; // update variables to reflect this for next cycle
+		}
+        // write if x is pressed this cycle
         if (x) { output += "x"; }
 
-		int y = master.get_digital(DIGITAL_Y);
-		int l2 = master.get_digital(DIGITAL_L2);
-		int r2 = master.get_digital(DIGITAL_R2);
-		if (y == 1) {
-			const int current_angle = rotation.get_position();
-			if (current_angle != ideal_angle) {
-				arm.move_relative(ideal_angle + current_angle, 100);
+		// checks if y, l2, or r2 are pressed
+		int y = master.get_digital(DIGITAL_Y); // prime button
+		int l2 = master.get_digital(DIGITAL_L2); // reverse button
+		int r2 = master.get_digital(DIGITAL_R2); // forward button
+		if (y == 1) { // if y is pressed
+			const int current_angle = rotation.get_position(); // get the current angle of the arm
+			if (current_angle != ideal_angle) { // and check to make sure it is not already at the ideal angle (not possible btw)
+				arm.move_relative(ideal_angle + current_angle, 100); // and then move it the proper relative angle to move toward the ideal angle set earlier
 			}
-		} else if (l2 == 1) {
-			arm.move(-30);
-		} else if (r2 == 1) {
-			arm.move(30);
-		} else {
-			arm.move(0);
-			arm.set_brake_mode(pros::E_MOTOR_BRAKE_HOLD);
-			arm.brake();
+		} else if (l2 == 1) { // or if l2 is pressed
+			arm.move(-30); // reverse the arm at 30/127 speed
+		} else if (r2 == 1) { // or if r2 is pressed
+			arm.move(30); // move the arm forward at 30/127 speed
+		} else { // if none are pressed
+			arm.move(0); // stop the arm from moving
+			arm.set_brake_mode(pros::E_MOTOR_BRAKE_HOLD); // set the brake mode to hold
+			arm.brake(); // and brake
+			// the holding brakes should prevent the arm from falling from the force of gravity if in the air
 		}
+        // write each button that is pressed this cycle
 		if (y) { output += "y"; }
 		if (l2) { output += "L"; }
 		if (r2) { output += "R"; }
 
 
-        output += "\n";
+        output += "\n"; // add a newline to signal the next cycle
 		pros::delay(20);                               // Run for 20 ms then update
-		time += 20;
+		time += 20; // update time variable to be accurate
 	}
 
+    // write output variable to file
 	try {
-		const char* charPtr = output.c_str();
-		char charArray[output.length() + 1];
-		strcpy(charArray, charPtr);
-		fputs(charArray, file);
-	} catch (const int e) {
+		const char* charPtr = output.c_str(); // cast string output as a char*
+		char charArray[output.length() + 1]; // initialize the charArray variable
+		strcpy(charArray, charPtr); // write the contents of charPtr to charArray
+		fputs(charArray, file); // add the contents of charArray to the file and save it
+	} catch (const int e) { // handle errors
 		char* error;
-		itoa(e, error, 100);
-		pros::lcd::print(3, error);
+		itoa(e, error, 100); // make integer into a char* to be able to print it
+		pros::lcd::print(3, error); // print the error code to the v5 brain screen
 	}
 
-	pros::lcd::print(1, "DONE");
+	pros::lcd::print(1, "DONE"); // print DONE to signal the file has been written to
 }
