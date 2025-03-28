@@ -47,10 +47,20 @@ void autonomous() {
 	pros::MotorGroup left_mg({1, -2, 3});    // Creates a motor group with forwards ports 1 & 3 and reversed port 2
 	pros::MotorGroup right_mg({-4, 5, -6});  // Creates a motor group with forwards port 5 and reversed ports 4 & 6
 	pros::Motor conveyor(-7);
-    pros::adi::AnalogOut clamp(1);
+	pros::adi::AnalogOut clamp(1);
+	pros::Motor arm(9);
+	pros::Rotation rotation(7);
+	pros::Optical color(16);
+
+	color.set_led_pwm(100);
+
+	rotation.reset_position();
+	const int ideal_angle = 1500; // 15 degrees
 
 	bool conveyorMoving = false;
-    bool clamped = false;
+	bool clamped = false;
+	bool last_clamped = false;
+	bool throw_blues = true;
 
 	FILE* file = fopen("/usd/recording.txt", "r");
 	if (file == NULL) {return;}
@@ -100,13 +110,34 @@ void autonomous() {
         int x;
         if (currentStr.find("x") != string::npos) { x = 1; } else { x = 0; }
 		if (x == 1) {
-			if (clamped) {
-				clamp.set_value(false);
-				clamped = false;
-			} else {
-				clamp.set_value(true);
-				clamped = true;
+        	if (last_clamped) {} else if (clamped) {
+            	clamp.set_value(false);
+                clamped = false;
+            } else {
+            	clamp.set_value(true);
+                clamped = true;
+            }
+			last_clamped = true;
+        } else {
+        	last_clamped = false;
+        }
+        int y, l2, r2;
+        if (currentStr.find("y") != string::npos) { y = 1; } else { y = 0; }
+        if (currentStr.find("L") != string::npos) { l2 = 1; } else { l2 = 0; }
+        if (currentStr.find("R") != string::npos) { r2 = 1; } else { r2 = 0; }
+        if (y == 1) {
+			const int current_angle = rotation.get_position();
+			if (current_angle != ideal_angle) {
+				arm.move_relative(ideal_angle + current_angle, 100);
 			}
+		} else if (l2 == 1) {
+			arm.move(-30);
+		} else if (r2 == 1) {
+			arm.move(30);
+		} else {
+			arm.move(0);
+			arm.set_brake_mode(pros::E_MOTOR_BRAKE_HOLD);
+			arm.brake();
 		}
 		pros::delay(20);                               // Run for 20 ms then update
 		time += 20;
