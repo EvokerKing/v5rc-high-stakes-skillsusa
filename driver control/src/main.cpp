@@ -59,15 +59,26 @@ void opcontrol() {
 	pros::Controller master(pros::E_CONTROLLER_MASTER);
 	pros::MotorGroup left_mg({1, -2, 3});    // Creates a motor group with forwards ports 1 & 3 and reversed port 2
 	pros::MotorGroup right_mg({-4, 5, -6});  // Creates a motor group with forwards port 5 and reversed ports 4 & 6
-	pros::Motor conveyor(-7);
-    pros::adi::AnalogOut clamp(1);
+	pros::Motor conveyor(-10);
+    pros::adi::DigitalOut clamp(1);
+    pros::Motor arm(9);
+    pros::Rotation rotation(7);
+    pros::Optical color(16);
+
+    color.set_led_pwm(100);
+
+    rotation.reset_position();
+    const int ideal_angle = 1500; // 15 degrees
 
 	bool conveyorMoving = false;
     bool clamped = false;
+	bool last_clamped = false;
+    bool throw_blues = true;
 
 	while (true) {
 		pros::lcd::print(0, "left %d right %d", master.get_analog(ANALOG_LEFT_Y),
 		                 master.get_analog(ANALOG_RIGHT_X));  // Prints status of the emulated screen LCDs
+		pros::lcd::print(1, "rotational %d", rotation.get_position());
 
 		// Arcade control scheme
 		int dir = master.get_analog(ANALOG_LEFT_Y) * -1;    // Gets amount forward/backward from left joystick
@@ -86,25 +97,46 @@ void opcontrol() {
 			conveyor.move(127);
 			conveyorMoving = true;
 		} else if (r1 == 1) {
-			conveyor.move_voltage(6000);
+			conveyor.move_voltage(9000);
 			conveyorMoving = false;
 		} else if (l1 == 1) {
-			conveyor.move_voltage(-6000);
+			conveyor.move_voltage(-9000);
 			conveyorMoving = false;
-		} else if (abs(conveyor.get_current_draw()) <= 6000 && !conveyorMoving) {
+		} else if (abs(conveyor.get_current_draw()) <= 5000 && !conveyorMoving) {
 			conveyor.brake();
 		}
 
         int x = master.get_digital(DIGITAL_X);
         if (x == 1) {
-        	if (clamped) {
+			if (last_clamped) {} else if (clamped) {
             	clamp.set_value(false);
                 clamped = false;
             } else {
             	clamp.set_value(true);
                 clamped = true;
             }
-        }
+			last_clamped = true;
+        } else {
+			last_clamped = false;
+		}
+
+        int y = master.get_digital(DIGITAL_Y);
+        int l2 = master.get_digital(DIGITAL_L2);
+        int r2 = master.get_digital(DIGITAL_R2);
+        if (y == 1) {
+			const int current_angle = rotation.get_position();
+			if (current_angle != ideal_angle) {
+				arm.move_relative(ideal_angle + current_angle, 100);
+			}
+        } else if (l2 == 1) {
+			arm.move(-30);
+        } else if (r2 == 1) {
+			arm.move(30);
+        } else {
+			arm.move(0);
+			arm.set_brake_mode(pros::E_MOTOR_BRAKE_HOLD);
+			arm.brake();
+		}
 
 		pros::delay(20);                               // Run for 20 ms then update
 	}
