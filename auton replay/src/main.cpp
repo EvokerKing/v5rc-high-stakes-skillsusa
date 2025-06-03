@@ -78,6 +78,7 @@ void autonomous() {
 	} while (add); // if theres no value for add, stop adding variables
 
 	for (int i = 0; i <= instr.size(); i++) { // for each instruction in the instr variable
+        if (time >= 60000) { break; }
 		char* current = instr[i]; // make it into a new variable for easier use
         string currentStr = current; // cast it to a string
 
