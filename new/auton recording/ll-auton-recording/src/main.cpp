@@ -61,28 +61,6 @@ pros::adi::DigitalOut clamp(1); // set the pneumatics solenoid controlling the c
 FILE* file = fopen("/usd/recording.txt", "w"); // open the recording file with write mode
 std::string output = ""; // initialize the string that will be written, as this variable will be added to every cycle
 
-// curve settings
-float sens = 1.02;
-int deadzone = 1;
-int minimum = 3;
-// function to apply input curve to an integer
-int curve(const int start) {
-	if (abs(start) <= deadzone) { // return 0 if within deadzone
-		return 0;
-	}
-	const int g = abs(start) - deadzone; // get absolute value of number and remove deadzone
-	// get a multiply value for if the number is negative or positive
-	int sign;
-	if (start < 0) {
-		sign = -1;
-	} else {
-		sign = 1;
-	}
-	const int i = pow(sens, (g - 127)) * g * sign; // exponential equation of sensitivity to the absolute value minus the maximum value, then multiply it by the absolute value and the sign
-	const int k = (127 - minimum) / 127 * (i * (127 / i)) + minimum * sign; // get the final value from the total possible values and i variable and add the minimum
-	return k;
-}
-
 void initialize() {
 	pros::lcd::initialize(); // initialize the robot screen
 	chassis.calibrate(); // calibrate the sensors
@@ -113,7 +91,7 @@ void opcontrol() {
 		int leftThumbstick = controller.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y);
 		int rightThumbstick = controller.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_X);
 
-		chassis.curvature(curve(leftThumbstick), curve(rightThumbstick), false); // set up arcade mode driving
+		chassis.curvature(leftThumbstick, rightThumbstick, false); // set up arcade mode driving
 
 		// write pose information to output
 		output += std::to_string(chassis.getPose().x) + ":" + std::to_string(chassis.getPose().y) + ":" + std::to_string(chassis.getPose().theta) + ":" + std::to_string(pros::millis() - last_time);
