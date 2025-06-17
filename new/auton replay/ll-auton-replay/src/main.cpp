@@ -18,7 +18,7 @@ lemlib::Drivetrain drivetrain( // create a drivetrain object that declares the f
 	4 //TODO: figure out horizontal drift, 2 is recommended for all omni, 8 is recommended for all traction
 	//         higher value means faster but overshoots more on turns
 );
-pros::Imu imu(11); // setup a variable to store the inertial sensor
+pros::Imu imu(7); // setup a variable to store the inertial sensor
 lemlib::OdomSensors sensors( // create an odom object that declares the following:
 	nullptr, // no tracking wheels, same for all nullptrs
 	nullptr,
@@ -63,26 +63,24 @@ vector<char*> instr; // create the instr variable as a list of char*s
 // rest is in initialize
 
 void initialize() {
+	std::printf("debug\n"); //GOOD
 	pros::lcd::initialize(); // initialize the robot screen
+	std::printf("debug\n"); //GOOD
 	chassis.calibrate(); // calibrate the sensors
+	std::printf("debug\n"); //GOOD
 	FILE* file = fopen("/usd/recording.txt", "r"); // open the saved auton recording file
-	char buf[100000]; // create a buffer variable for the file contents
-	fread(buf, 1, 100000, file); // read the file and add the contents to the buf variable
+	std::printf("debug\n"); //GOOD
+	char buf[200000]; // create a buffer variable for the file contents
+	fread(buf, 1, 200000, file); // read the file and add the contents to the buf variable
+	std::printf("debug\n"); //BAD
+	std::printf("%s\n", buf);
 	char* add = strtok(buf, "\n"); // get first index of split strings
+	std::printf("debug\n");
 	do { // while loop but it will run at least once
 		instr.push_back(add); // add the char* to the instr list
 		add = strtok(NULL, "\n"); // update add variable to be the next index of the split strings
 	} while (add); // if theres no value for add, stop adding variables
-	pros::Task screen_task([&]() { // display robot information on screen
-		while (true) { // forever loop
-			// print each:
-			pros::lcd::print(0, "X: %f", chassis.getPose().x); // x
-			pros::lcd::print(1, "Y: %f", chassis.getPose().y); // y
-			pros::lcd::print(2, "Theta: %f", chassis.getPose().theta); // heading
-			pros::lcd::print(3, "Time: %u", pros::millis()); // screen time info
-			pros::delay(20); // every 20 milliseconds
-		}
-	});
+	std::printf("debug\n");
 }
 
 void autonomous() {
@@ -91,6 +89,12 @@ void autonomous() {
 	bool last_clamped = false; // variable to track if the clamp was activated or deactivated on the last cycle. used to prevent the clamp going up and down too quickly on accident
 
 	for (int i = 0; i <= instr.size(); i++) { // for each instruction in the instr variable
+		// print each:
+		pros::lcd::print(0, "X: %f", chassis.getPose().x); // x
+		pros::lcd::print(1, "Y: %f", chassis.getPose().y); // y
+		pros::lcd::print(2, "Theta: %f", chassis.getPose().theta); // heading
+		pros::lcd::print(3, "Time: %u", pros::millis()); // screen time info
+
 		char* current = instr[i]; // make it into a new variable for easier use
 		string currentStr = current; // cast it to a string
 

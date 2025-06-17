@@ -16,7 +16,7 @@ lemlib::Drivetrain drivetrain( // create a drivetrain object that declares the f
 	4 //TODO: figure out horizontal drift, 2 is recommended for all omni, 8 is recommended for all traction
 	//         higher value means faster but overshoots more on turns
 );
-pros::Imu imu(11); // setup a variable to store the inertial sensor
+pros::Imu imu(7); // setup a variable to store the inertial sensor
 lemlib::OdomSensors sensors( // create an odom object that declares the following:
 	nullptr, // no tracking wheels, same for all nullptrs
 	nullptr,
@@ -57,29 +57,31 @@ pros::Controller controller(pros::E_CONTROLLER_MASTER); // get the paired contro
 pros::Motor conveyor(-10); // set the motor for the conveyor to port 10 reversed
 pros::adi::DigitalOut clamp(1); // set the pneumatics solenoid controlling the clamp
 
-// auton recording stuff
-FILE* file = fopen("/usd/recording.txt", "w"); // open the recording file with write mode
-std::string output = ""; // initialize the string that will be written, as this variable will be added to every cycle
+// auton recording variables
+FILE* file;
+int error = 0;
 
 void initialize() {
 	pros::lcd::initialize(); // initialize the robot screen
 	chassis.calibrate(); // calibrate the sensors
-	pros::Task screen_task([&]() { // display robot information on screen
-		while (true) { // forever loop
-			// print each:
-			pros::lcd::print(0, "X: %f", chassis.getPose().x); // x
-			pros::lcd::print(1, "Y: %f", chassis.getPose().y); // y
-			pros::lcd::print(2, "Theta: %f", chassis.getPose().theta); // heading
-			pros::lcd::print(3, "Time: %u", pros::millis()); // screen time info
-			pros::delay(20); // every 20 milliseconds
-		}
-	});
+
+	// auton recording stuff
+	file = fopen("/usd/recording.txt", "w"); // open the recording file with write mode
+	if (file == nullptr) {
+		pros::lcd::print(4, "COULD NOT OPEN FILE");
+		error = 1;
+	}
 }
 
 void autonomous() {}
 
 // driver control function
 void opcontrol() {
+	// check for error
+	if (error == 1) {
+		return;
+	}
+
 	bool conveyorMoving = false; // variable to track if the conveyor is actively moving. used for checks when no button is pressed but power draw is low
 	bool clamped = false; // variable to track if the clamp is currently down. used to allow both actions to be mapped to 1 button
 	bool last_clamped = false; // variable to track if the clamp was activated or deactivated on the last cycle. used to prevent the clamp going up and down too quickly on accident
@@ -87,6 +89,14 @@ void opcontrol() {
 	uint last_time = pros::millis();
 
 	while (pros::millis() <= 60000) { // main loop
+		std::string output = ""; // initialize the string that will be written this cycle
+
+		// print each:
+		pros::lcd::print(0, "X: %f", chassis.getPose().x); // x
+		pros::lcd::print(1, "Y: %f", chassis.getPose().y); // y
+		pros::lcd::print(2, "Theta: %f", chassis.getPose().theta); // heading
+		pros::lcd::print(3, "Time: %u", pros::millis()); // screen time info
+
 		// get thumbstick positions
 		int leftThumbstick = controller.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y);
 		int rightThumbstick = controller.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_X);
@@ -144,23 +154,15 @@ void opcontrol() {
 		// write if x is pressed this cycle
 		if (x) { output += "x"; }
 
-		pros::delay(20); // run main loop every 20ms
         output += "\n"; // add a newline to signal the next cycle
+		if (fputs(output.c_str(), file) == EOF) {
+			pros::lcd::print(4, "ERROR WRITING TO FILE"); // print to signal an error occurred
+		}
+
+		pros::delay(20); // run main loop every 20ms
 	}
 
 	std::printf("WHILE LOOP FINISHED\n");
 
-	// write output variable to file
-	try {
-		const char* charPtr = output.c_str(); // cast string output as a char*
-		char charArray[output.length() + 1]; // initialize the charArray variable
-		strcpy(charArray, charPtr); // write the contents of charPtr to charArray
-		fputs(charArray, file); // add the contents of charArray to the file and save it
-	} catch (const int e) { // handle errors
-		char* error;
-		itoa(e, error, 100); // make integer into a char* to be able to print it
-		pros::lcd::print(4, error); // print the error code to the v5 brain screen
-	}
-
-	pros::lcd::print(4, "FILE WRITTEN SUCCESSFULLY"); // print to signal the file has been written to
+	fclose(file);
 }

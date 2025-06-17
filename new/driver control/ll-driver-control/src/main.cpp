@@ -14,7 +14,7 @@ lemlib::Drivetrain drivetrain( // create a drivetrain object that declares the f
 	4 //TODO: figure out horizontal drift, 2 is recommended for all omni, 8 is recommended for all traction
 	//         higher value means faster but overshoots more on turns
 );
-pros::Imu imu(11); // setup a variable to store the inertial sensor
+pros::Imu imu(7); // setup a variable to store the inertial sensor
 lemlib::OdomSensors sensors( // create an odom object that declares the following:
 	nullptr, // no tracking wheels, same for all nullptrs
 	nullptr,
@@ -58,15 +58,6 @@ pros::adi::DigitalOut clamp(1); // set the pneumatics solenoid controlling the c
 void initialize() {
 	pros::lcd::initialize(); // initialize the robot screen
 	chassis.calibrate(); // calibrate the sensors
-	pros::Task screen_task([&]() { // display robot information on screen
-		while (true) { // forever loop
-			// print each:
-			pros::lcd::print(0, "X: %f", chassis.getPose().x); // x
-			pros::lcd::print(1, "Y: %f", chassis.getPose().y); // y
-			pros::lcd::print(2, "Theta: %f", chassis.getPose().theta); // heading
-			pros::delay(20); // every 20 milliseconds
-		}
-	});
 }
 
 void autonomous() {}
@@ -78,6 +69,12 @@ void opcontrol() {
 	bool last_clamped = false; // variable to track if the clamp was activated or deactivated on the last cycle. used to prevent the clamp going up and down too quickly on accident
 	
 	while (true) { // main loop
+		// print each:
+		pros::lcd::print(0, "X: %f", chassis.getPose().x); // x
+		pros::lcd::print(1, "Y: %f", chassis.getPose().y); // y
+		pros::lcd::print(2, "Theta: %f", chassis.getPose().theta); // heading
+		pros::delay(20); // every 20 milliseconds
+
 		// get thumbstick positions
 		int leftThumbstick = controller.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y);
 		int rightThumbstick = controller.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_X);

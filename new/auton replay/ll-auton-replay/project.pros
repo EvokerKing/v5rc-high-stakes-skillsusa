@@ -1,7 +1,7 @@
 {
   "py/object": "pros.conductor.project.Project",
   "py/state": {
-    "project_name": "ll-auton-recording",
+    "project_name": "ll-auton-replay",
     "target": "v5",
     "templates": {
       "LemLib": {
@@ -298,9 +298,9 @@
       }
     },
     "upload_options": {
-      "description": "newer auton recording script",
-      "icon": "pizza",
-      "slot": 8
+      "description": "newer auton replay script",
+      "icon": "robot",
+      "slot": 2
     },
     "use_early_access": false
   }
