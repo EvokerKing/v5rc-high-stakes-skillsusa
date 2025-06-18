@@ -24,27 +24,26 @@ lemlib::OdomSensors sensors( // create an odom object that declares the followin
 	nullptr,
 	&imu // inertial sensor
 );
-//TODO: all of pid stuff
 lemlib::ControllerSettings lateral_controller(
-	0, // proportional gain (kP)
+	20, // proportional gain (kP)
 	0, // integral gain (kI)
-	0, // derivative gain (kD)
-	0, // anti windup
-	0, // small error range in inches
-	0, // small error range timeout in milliseconds
-	0, // large error range in inches
-	0, // large error range timeout in milliseconds
-	0 // maximum acceleration (slew)
+	8, // derivative gain (kD)
+	3, // anti windup
+	1, // small error range in inches
+	100, // small error range timeout in milliseconds
+	3, // large error range in inches
+	500, // large error range timeout in milliseconds
+	70 // maximum acceleration (slew)
 );
 lemlib::ControllerSettings angular_controller(
-	0, // proportional gain (kP)
+	5, // proportional gain (kP)
 	0, // integral gain (kI)
-	0, // derivative gain (kD)
-	0, // anti windup
-	0, // small error range in inches
-	0, // small error range timeout in milliseconds
-	0, // large error range in inches
-	0, // large error range timeout in milliseconds
+	20, // derivative gain (kD)
+	6, // anti windup
+	1, // small error range in inches
+	100, // small error range timeout in milliseconds
+	3, // large error range in inches
+	500, // large error range timeout in milliseconds
 	0 // maximum acceleration (slew)
 );
 lemlib::Chassis chassis( // create a chassis object that declares the following:
@@ -87,6 +86,8 @@ void opcontrol() {
 	bool last_clamped = false; // variable to track if the clamp was activated or deactivated on the last cycle. used to prevent the clamp going up and down too quickly on accident
 
 	uint last_time = pros::millis();
+	int until_update = 0;
+	std::string buttons = "";
 
 	while (pros::millis() <= 60000) { // main loop
 		std::string output = ""; // initialize the string that will be written this cycle
@@ -104,9 +105,7 @@ void opcontrol() {
 		chassis.curvature(leftThumbstick, rightThumbstick, false); // set up arcade mode driving
 
 		// write pose information to output
-		output += std::to_string(chassis.getPose().x) + ":" + std::to_string(chassis.getPose().y) + ":" + std::to_string(chassis.getPose().theta) + ":" + std::to_string(pros::millis() - last_time);
-
-		last_time = pros::millis(); // update last_time variable
+		output += std::to_string(round(chassis.getPose().x * 100.0) / 100.0) + ":" + std::to_string(round(chassis.getPose().y * 100.0) / 100.0) + ":" + std::to_string(round(chassis.getPose().theta * 1.0) / 1.0) + ":" + std::to_string(pros::millis() - last_time);
 
 		// checks if buttons a, b, r1, or l1 are being pressed and stores them in corresponding variables
 		int a = controller.get_digital(DIGITAL_A); // start button
@@ -131,10 +130,10 @@ void opcontrol() {
 			// note this is mainly to prevent issues with the conveyor not stopping after l1 or r1 is pressed or not stopping for the main a button
 		}
 		// write each button that is pressed this cycle
-		if (a) { output += "a"; }
-		if (b) { output += "b"; }
-		if (r1) { output += "r"; }
-		if (l1) { output += "l"; }
+		if (a) { buttons += "a"; }
+		if (b) { buttons += "b"; }
+		if (r1) { buttons += "r"; }
+		if (l1) { buttons += "l"; }
 
 		// checks if the x button is pressed
 		int x = controller.get_digital(DIGITAL_X); // clamp interact button
@@ -152,11 +151,19 @@ void opcontrol() {
 			last_clamped = false; // update variables to reflect this for next cycle
 		}
 		// write if x is pressed this cycle
-		if (x) { output += "x"; }
+		if (x) { buttons += "x"; }
 
+		output += buttons;
         output += "\n"; // add a newline to signal the next cycle
-		if (fputs(output.c_str(), file) == EOF) {
-			pros::lcd::print(4, "ERROR WRITING TO FILE"); // print to signal an error occurred
+		if (until_update == 0) {
+			if (fputs(output.c_str(), file) == EOF) {
+				pros::lcd::print(4, "ERROR WRITING TO FILE"); // print to signal an error occurred
+			}
+			buttons = "";
+			until_update = 5;
+			last_time = pros::millis(); // update last_time variable
+		} else {
+			until_update -= 1;
 		}
 
 		pros::delay(20); // run main loop every 20ms
