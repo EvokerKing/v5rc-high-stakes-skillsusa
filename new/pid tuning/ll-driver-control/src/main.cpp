@@ -22,26 +22,27 @@ lemlib::OdomSensors sensors( // create an odom object that declares the followin
 	nullptr,
 	&imu // inertial sensor
 );
+//TODO: all of pid stuff
 lemlib::ControllerSettings lateral_controller(
-	20, // proportional gain (kP)
+	0, // proportional gain (kP)
 	0, // integral gain (kI)
-	8, // derivative gain (kD)
-	3, // anti windup
-	1, // small error range in inches
-	100, // small error range timeout in milliseconds
-	3, // large error range in inches
-	500, // large error range timeout in milliseconds
-	70 // maximum acceleration (slew)
+	0, // derivative gain (kD)
+	0, // anti windup
+	0, // small error range in inches
+	0, // small error range timeout in milliseconds
+	0, // large error range in inches
+	0, // large error range timeout in milliseconds
+	0 // maximum acceleration (slew)
 );
 lemlib::ControllerSettings angular_controller(
-	5, // proportional gain (kP)
+	2, // proportional gain (kP)
 	0, // integral gain (kI)
-	20, // derivative gain (kD)
-	6, // anti windup
-	1, // small error range in inches
-	100, // small error range timeout in milliseconds
-	3, // large error range in inches
-	500, // large error range timeout in milliseconds
+	10, // derivative gain (kD)
+	0, // anti windup
+	0, // small error range in inches
+	0, // small error range timeout in milliseconds
+	0, // large error range in inches
+	0, // large error range timeout in milliseconds
 	0 // maximum acceleration (slew)
 );
 lemlib::Chassis chassis( // create a chassis object that declares the following:
@@ -53,8 +54,6 @@ lemlib::Chassis chassis( // create a chassis object that declares the following:
 pros::Controller controller(pros::E_CONTROLLER_MASTER); // get the paired controller
 pros::Motor conveyor(-10); // set the motor for the conveyor to port 10 reversed
 pros::adi::DigitalOut clamp(1); // set the pneumatics solenoid controlling the clamp
-pros::Rotation rotation(20);
-pros::MotorGroup arm({ 8, -9 });
 
 void initialize() {
 	pros::lcd::initialize(); // initialize the robot screen
@@ -119,26 +118,6 @@ void opcontrol() {
 			last_clamped = true; // update variables at end to say x was pressed this (which will be last) cycle
 		} else { // or if x isn't pressed
 			last_clamped = false; // update variables to reflect this for next cycle
-		}
-
-		// checks if y, l2, or r2 are pressed
-		int y = controller.get_digital(DIGITAL_Y); // prime button
-		int l2 = controller.get_digital(DIGITAL_L2); // reverse button
-		int r2 = controller.get_digital(DIGITAL_R2); // forward button
-		if (y == 1) { // if y is pressed
-			const int current_angle = rotation.get_position(); // get the current angle of the arm
-			if (current_angle != 1500) { // and check to make sure it is not already at the ideal angle (not possible btw)
-				arm.move_relative(1500 + current_angle, 100); // and then move it the proper relative angle to move toward the ideal angle set earlier
-			}
-		} else if (l2 == 1) { // or if l2 is pressed
-			arm.move(-30); // reverse the arm at 30/127 speed
-		} else if (r2 == 1) { // or if r2 is pressed
-			arm.move(30); // move the arm forward at 30/127 speed
-		} else { // if none are pressed
-			arm.move(0); // stop the arm from moving
-			arm.set_brake_mode(pros::E_MOTOR_BRAKE_HOLD); // set the brake mode to hold, which technically doesn't exist on the mc55 but others said it worked so just leaving it in case
-			arm.brake(); // and brake
-			// the holding brakes should prevent the arm from falling from the force of gravity if in the air
 		}
 
 		pros::delay(20); // run main loop every 20ms

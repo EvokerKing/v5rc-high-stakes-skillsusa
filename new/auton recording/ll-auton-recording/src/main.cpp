@@ -55,6 +55,8 @@ lemlib::Chassis chassis( // create a chassis object that declares the following:
 pros::Controller controller(pros::E_CONTROLLER_MASTER); // get the paired controller
 pros::Motor conveyor(-10); // set the motor for the conveyor to port 10 reversed
 pros::adi::DigitalOut clamp(1); // set the pneumatics solenoid controlling the clamp
+pros::Rotation rotation(20);
+pros::MotorGroup arm({ 8, -9 });
 
 // auton recording variables
 FILE* file;
@@ -152,6 +154,30 @@ void opcontrol() {
 		}
 		// write if x is pressed this cycle
 		if (x) { buttons += "x"; }
+
+		// checks if y, l2, or r2 are pressed
+		int y = controller.get_digital(DIGITAL_Y); // prime button
+		int l2 = controller.get_digital(DIGITAL_L2); // reverse button
+		int r2 = controller.get_digital(DIGITAL_R2); // forward button
+		if (y == 1) { // if y is pressed
+			const int current_angle = rotation.get_position(); // get the current angle of the arm
+			if (current_angle != 1500) { // and check to make sure it is not already at the ideal angle (not possible btw)
+				arm.move_relative(1500 + current_angle, 100); // and then move it the proper relative angle to move toward the ideal angle set earlier
+			}
+		} else if (l2 == 1) { // or if l2 is pressed
+			arm.move(-30); // reverse the arm at 30/127 speed
+		} else if (r2 == 1) { // or if r2 is pressed
+			arm.move(30); // move the arm forward at 30/127 speed
+		} else { // if none are pressed
+			arm.move(0); // stop the arm from moving
+			arm.set_brake_mode(pros::E_MOTOR_BRAKE_HOLD); // set the brake mode to hold, which technically doesn't exist on the mc55 but others said it worked so just leaving it in case
+			arm.brake(); // and brake
+			// the holding brakes should prevent the arm from falling from the force of gravity if in the air
+		}
+		if (y) { buttons += "y"; }
+		if (l2) { buttons += "L"; }
+		if (r2) { buttons += "R"; }
+
 
 		output += buttons;
         output += "\n"; // add a newline to signal the next cycle
