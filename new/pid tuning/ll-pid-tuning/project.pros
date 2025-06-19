@@ -300,7 +300,7 @@
     "upload_options": {
       "description": "tune the pid stuff",
       "icon": "planet",
-      "slot": 7
+      "slot": 8
     },
     "use_early_access": false
   }

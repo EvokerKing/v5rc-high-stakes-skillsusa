@@ -300,7 +300,7 @@
     "upload_options": {
       "description": "newer auton recording script",
       "icon": "pizza",
-      "slot": 8
+      "slot": 3
     },
     "use_early_access": false
   }
